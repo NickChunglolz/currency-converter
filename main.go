@@ -3,70 +3,78 @@ package main
 import (
 	"errors"
 	"fmt"
-	"os"
+	"log"
 	"strconv"
 
+	"github.com/NickChunglolz/currency-converter/client"
 	"github.com/charmbracelet/huh"
+	"github.com/joho/godotenv"
 )
 
-const (
-	twd = "TWD"
-	cad = "CAD"
-	usd = "USD"
-	gbp = "GBP"
-	eur = "EUR"
-	jpy = "JPY"
-)
-
-var currenyOptions = []huh.Option[string]{
-	huh.NewOption("NTD", twd),
-	huh.NewOption("CAD", cad),
-	huh.NewOption("USD", usd),
-	huh.NewOption("GBP", gbp),
-	huh.NewOption("EUR", eur),
-	huh.NewOption("JYP", jpy),
+type Currency struct {
+	Code   string
+	Symbol string
 }
 
 func main() {
 
-	var baseCurrency string
-	var optCurrency string
+	godotenv.Load()
+
+	client := client.NewClient()
+
+	currencyReplies, _ := client.GetCurrencies()
+	currencyOptions := generateCurrencyOptions(currencyReplies)
+
+	var baseCurrency *Currency
+	var optCurrency *Currency
 	var amount string
 	var result float64
 
-	err :=
-		huh.NewForm(
-			huh.NewGroup(
-				huh.NewSelect[string]().
-					Title("What is you base currency?").
-					Value(&baseCurrency).
-					Options(currenyOptions...),
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[*Currency]().
+				Title("What is you base currency?").
+				Value(&baseCurrency).
+				Options(currencyOptions...),
 
-				huh.NewSelect[string]().
-					Title("What currency do you want to convert into?").
-					Value(&optCurrency).
-					Options(currenyOptions...),
+			huh.NewSelect[*Currency]().
+				Title("What currency do you want to convert into?").
+				Value(&optCurrency).
+				Options(currencyOptions...),
 
-				huh.NewInput().
-					Title("How much do you want to convert?").
-					Value(&amount).
-					Placeholder("Enter amount of money...").
-					Validate(func(str string) error {
-						if _, err := strconv.ParseFloat(amount, 64); err != nil {
-							return errors.New("wrong format input")
-						}
-						return nil
-					}),
-			),
-		).Run()
+			huh.NewInput().
+				Title("How much do you want to convert?").
+				Value(&amount).
+				Placeholder("Enter amount of money...").
+				Validate(func(str string) error {
+					if _, err := strconv.ParseFloat(amount, 64); err != nil {
+						return errors.New("wrong format input")
+					}
+					return nil
+				}),
+		),
+	)
+
+	err := form.Run()
 
 	if err != nil {
-		fmt.Println("Trouble int converting currency convert:", err)
-		os.Exit(1)
+		log.Fatal("Trouble int converting currency convert:", err)
 	}
 
+	rateReplies, _ := client.GetRates(baseCurrency.Code, optCurrency.Code)
 	amountValue, _ := strconv.ParseFloat(amount, 64)
-	result = amountValue * 32
 
-	fmt.Printf("The %s %s equal to %s %.2f \n", baseCurrency, amount, optCurrency, result)
+	result = rateReplies[0].Rate * amountValue
+
+	fmt.Printf("The %s%s equal to %s%.2f \n", baseCurrency.Symbol, amount, optCurrency.Symbol, result)
+}
+
+func generateCurrencyOptions(currencyReplies []client.CurrencyReply) []huh.Option[*Currency] {
+	var options []huh.Option[*Currency]
+
+	for _, r := range currencyReplies {
+		options = append(options, huh.NewOption(fmt.Sprintf("%s(%s)", r.Code, r.Symbol), &Currency{Code: r.Code, Symbol: r.Symbol}))
+	}
+
+	return options
 }

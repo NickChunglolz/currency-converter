@@ -3,7 +3,7 @@
 ## Overview
 Easy way terminal currency converting app to calculate an amount of money to different currencies.
 
-![alt text](<Pasted Graphic 11.png>)
+![screenshot](./asset/app_screenshot.png)
 
 
 ## UML
